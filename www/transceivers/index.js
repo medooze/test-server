@@ -31,6 +31,7 @@ function addRemoteTrack(event)
 	
 	//Play it
 	video.autoplay = true;
+	video.playsInline = true;
 	video.play();
 	
 	//Add them
@@ -115,6 +116,7 @@ function addLocalStream(track,stream)
 	//Start playing
 	video.muted = true;
 	video.autoplay = true;
+	video.playsInline = true;
 	video.play();
 	
 	return button;
