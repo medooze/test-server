@@ -49,6 +49,7 @@ function addVideoForStream(stream,muted)
 	video.srcObject = stream;
 	//Set other properties
 	video.autoplay = true;
+	video.playsInline = true;
 	video.muted = muted;
 }
 
