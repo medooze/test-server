@@ -30,11 +30,13 @@
 	<body>
 		<br><button class="mdl-button mdl-js-button mdl-button--raised" id="h264">H264 simulcast</button>
 		<br><br><button class="mdl-button mdl-js-button mdl-button--raised" id="vp8">VP8  simulcast</button>
-		<br><br><button class="mdl-button mdl-js-button mdl-button--raised" id="transceivers">Transceivers  </button>
+		<br><br><button class="mdl-button mdl-js-button mdl-button--raised" id="transceivers">Transceivers </button>
+		<br><br><button class="mdl-button mdl-js-button mdl-button--raised" id="partyline">Party line</button>
 	</body>
 	<script>
 		h264.onclick = () => document.location.href = "/simulcast?codec=h264";
 		vp8.onclick = () => document.location.href = "/simulcast?codec=vp8";
 		transceivers.onclick = () => document.location.href = "/transceivers";
+		partyline.onclick = () => document.location.href = "/partyline";
 	</script>
 </html>	

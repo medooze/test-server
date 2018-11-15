@@ -61,62 +61,26 @@ function removeRemoteTrack(event)
 	return div;
 }
 
-function createLocalStream(i)
-{
-	//Create new canvs
-	const canvas = document.createElement("canvas");
-	//Fix width and height so encoding is not too expensive
-	canvas.height = 64;
-	canvas.width = 64;
-	
-	//Draw number
-	var ctx = canvas.getContext("2d");
-	
-	//Periodically update it
-	let num = 0;
-	canvas.timer = setInterval(()=>{
-		var ctx = canvas.getContext("2d");
-		ctx.beginPath();
-		ctx.fillStyle = "white";
-		ctx.fillRect(0,0,64,64);
-		ctx.fillStyle = "red";
-		ctx.font = "32pt Arial";
-		ctx.fillText(i,20,48);
-		ctx.lineWidth = 6;
-		ctx.strokeStyle = 'white';
-		ctx.arc(32,32,20,0,2*Math.PI);
-		ctx.stroke();
-		ctx.beginPath();
-		ctx.lineWidth = 4;
-		ctx.strokeStyle = 'black';
-		ctx.arc(32,32,20,-Math.PI/2,-Math.PI/2 + (num++%11)*Math.PI/5);
-		ctx.stroke();
-	},100);
-	
-	return canvas;
-}
 
-function addLocalStream(track,stream)
+function addLocalStream(stream)
 {
 	//Create html stuff
 	const div	= document.createElement("div");
 	const video	= document.createElement("video");
 	const button	= document.createElement("button");
-	div.style.width = "64px";
 	button.innerHTML= "&#x1F5D1"; 
 	
 	//Set video source (no  audio tracks in demo)
 	video.srcObject = stream;
 	
 	//Add them
-	div.appendChild(button);
 	div.appendChild(video);
+	div.appendChild(button);
 	localVideos.append(div);
 	
 	//Start playing
 	video.muted = true;
 	video.autoplay = true;
-	video.playsInline = true;
 	video.play();
 	
 	return button;
@@ -129,22 +93,14 @@ const AudioContext = window.AudioContext || window.webkitAudioContext;
 
 async function sendTrack(simulcast,codecs)
 {
-		//Create new canvas
-		const canvas = createLocalStream(streams++);
 		//Get stream
-		const stream = canvas.captureStream();
-		//Get video track
-		const videoTrack = stream.getVideoTracks()[0];
-
-		//Create audio track
-		var audioContext = new AudioContext();
-		var oscilator = audioContext.createOscillator();
-		var audioTrack = audioContext.createMediaStreamDestination().stream.getAudioTracks()[0];
-
-		//Add to stream
-		stream.addTrack(audioTrack);
+		const stream = await navigator.mediaDevices.getUserMedia({
+			audio: true,
+			video: {width: 1280, height: 720}
+		});
+		
 		//Add local video
-		const button = addLocalStream(videoTrack,stream);
+		const button = addLocalStream(stream);
 		
 		//The params object
 		const params = {};
@@ -164,21 +120,23 @@ async function sendTrack(simulcast,codecs)
 			params.codecs = [codecs];
 			
 		//Add to pc
-		const [audioSender,videoSender] = await Promise.all([pc.addTrack(audioTrack,stream),pc.addTrack(videoTrack,stream,params)]);
+		const [audioSender,videoSender] = await Promise.all([
+			pc.addTrack(stream.getAudioTracks()[0],stream),
+			pc.addTrack(stream.getVideoTracks()[0],stream,params)
+		]);
 
 		//Remove 
 		button.onclick = () => {
 			//Remove without  wait
 			pc.removeTrack(audioSender);
 			pc.removeTrack(videoSender);
-			clearInterval(canvas.timer);
 			localVideos.removeChild(button.parentNode);
 		};
 };
 //Start everything
 window.onload=()=>{
 	//Connect with websocket
-	const ws = new WebSocket(url,"transceivers");
+	const ws = new WebSocket(url,"partyline");
 	
 	//Crete transaction manager 
 	const tm = new TransactionManager(ws);
@@ -205,3 +163,4 @@ window.onload=()=>{
 		addSimulcastTrackH264.onclick	= ()=> sendTrack(true	,"h264");
 	};
 };
+;

@@ -98,6 +98,7 @@ const wsServer = new WebSocketServer ({
 const handlers = {
 	"simulcast"	: require("./lib/simulcast.js"),
 	"transceivers"	: require("./lib/PeerConnectionServerDemo.js"),
+	"partyline"	: require("./lib/PartyLine.js"),
 };
 
 wsServer.on ('request', (request) => {
