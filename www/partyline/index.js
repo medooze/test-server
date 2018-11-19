@@ -22,9 +22,11 @@ function addRemoteTrack(event)
 	//Create html stuff
 	const div	= document.createElement("div");
 	video		= document.createElement("video");
+	const stats	= document.createElement("div");
 	
 	//Set id
 	div.id = stream.id;
+	stats.classList = ["stats"];
 	
 	//Set video source
 	video.srcObject = stream;
@@ -36,6 +38,7 @@ function addRemoteTrack(event)
 	
 	//Add them
 	div.appendChild(video);
+	div.appendChild (stats)
 	remoteVideos.append(div);
 	
 	return div;
@@ -144,6 +147,38 @@ window.onload=()=>{
 	//Create managed peer connection
 	const client = new MediaServerClient(tm);
 	
+	//Listen for stats events
+	tm.on("event",(event)=>{
+		//Check event name
+		switch(event.name)
+		{
+			case "layers":
+			{	
+				//Get data
+				const streamId = event.data.streamId;
+				const layers = event.data.stats;
+				//get stream container
+				const container = document.querySelector("div[id='"+streamId+"']>.stats");
+				if (!container)
+					return;
+				//Cleat it
+				container.innerHTML="";
+				//For each layer
+				for (const layer of layers.layers)
+				{
+					const button = document.createElement("button");
+					button.innerText = "SL:"+layer.simulcastIdx+" TL:"+layer.temporalLayerId + " " + layer.bitrate +"bps";
+					container.appendChild (button);
+					button.onclick = ()=> tm.cmd("switch",{
+						streamId	: streamId,
+						encodingId	: layer.encodingId,
+						temporalLayerId : layer.temporalLayerId
+					});
+				}
+			}
+		}
+	})
+	
 	//Start on open
 	ws.onopen = async ()=>{
 		
@@ -163,4 +198,3 @@ window.onload=()=>{
 		addSimulcastTrackH264.onclick	= ()=> sendTrack(true	,"h264");
 	};
 };
-;

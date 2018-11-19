@@ -181,17 +181,38 @@
 	}
 	
 	#remoteVideos {
+		text-align: left;
 		display: flex;
 		position: relative;
 		flex-direction: row;
 		width: 100%;
 		height : 100%;
-		max-height: 210px;
+		max-height: 420px;
 		display: flex;
 		flex-direction: row;
 		overflow-x: auto;
 		overflow-y: hidden;
 	}
+	#remoteVideos video {
+		height: 240px;
+		max-width: 3600px;
+	}
+	
+	#remoteVideos .stats {
+		position: relative;
+		top: -250px;
+		left: 20px;
+		z-index: 10;
+	}
+	.stats button {
+		text-align: left;
+		display: block;
+		height: 12px;
+		font-size: 6pt;
+		width: 100px;
+		margin: 1px;
+		padding: 1px;
+	   }
 	
 	#localVideos {
 		position: relative;
@@ -207,9 +228,10 @@
 		position: relative
 	}
 	
+	
 	#localVideos video {
-		height: 320px;
-		max-width: 480px;
+		height: 240px;
+		max-width: 3600px;
 	}
 
 	#localVideos button{
