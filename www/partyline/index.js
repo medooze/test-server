@@ -92,18 +92,24 @@ function addLocalStream(stream)
 
 let pc;
 let streams = 0;
+let stream;
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 
 async function sendTrack(simulcast,codecs)
 {
-		//Get stream
-		const stream = await navigator.mediaDevices.getUserMedia({
-			audio: true,
-			video: {width: 1280, height: 720}
-		});
+		//Try to reuse streams
+		if (!stream)
+			//Get stream
+			stream = await navigator.mediaDevices.getUserMedia({
+				audio: true,
+				video: {width: 1280, height: 720}
+			});
+		
+		//Clone it
+		const cloned = stream.clone();
 		
 		//Add local video
-		const button = addLocalStream(stream);
+		const button = addLocalStream(cloned);
 		
 		//The params object
 		const params = {};
@@ -124,8 +130,8 @@ async function sendTrack(simulcast,codecs)
 			
 		//Add to pc
 		const [audioSender,videoSender] = await Promise.all([
-			pc.addTrack(stream.getAudioTracks()[0],stream),
-			pc.addTrack(stream.getVideoTracks()[0],stream,params)
+			pc.addTrack(cloned.getAudioTracks()[0],cloned),
+			pc.addTrack(cloned.getVideoTracks()[0],cloned,params)
 		]);
 
 		//Remove 
