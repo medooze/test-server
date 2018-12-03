@@ -2363,6 +2363,31 @@ class PeerConnectionClient
 		//Get remote sdp
 		this.remoteInfo = this.localInfo.answer(this.remote);
 		
+		//For all transceivers
+		for (const transceiver of this.pc.getTransceivers())
+		{
+			//If we have to override the codec
+			if (transceiver.codecs)
+			{
+				//Get local media
+				const localMedia = this.localInfo.getMediaById(transceiver.mid);
+				//Get remote capabilities
+				const capabilities = this.remote.capabilities[localMedia.getType()];
+				//If got none
+				if (!capabilities)
+					//Skip
+					continue;
+				//Clone capabilities for the media
+				const cloned = Object.assign({},capabilities);
+				//Set codecs
+				cloned.codecs = transceiver.codecs;
+				//Answer it
+				const answer = localMedia.answer(cloned);
+				//Replace media
+				this.remoteInfo.replaceMedia(answer);
+			}
+		}
+		
 		//Procces pending transceivers
 		for (let transceiver of processing)
 		{
@@ -2373,26 +2398,6 @@ class PeerConnectionClient
 				const mid = transceiver.mid;
 				//Get track for it
 				const track = this.localInfo.getTrackByMediaId(mid);
-				//If we have to override the codec
-				if (transceiver.codecs)
-				{
-					//Get local media
-					const localMedia = this.localInfo.getMediaById(transceiver.mid);
-					//Get remote capabilities
-					const capabilities = this.remote.capabilities[localMedia.getType()];
-					//If got none
-					if (!capabilities)
-						//Skip
-						continue;
-					//Clone capabilities for the media
-					const cloned = Object.assign({},capabilities);
-					//Set codecs
-					cloned.codecs = transceiver.codecs;
-					//Answer it
-					const answer = localMedia.answer(cloned);
-					//Replace media
-					this.remoteInfo.replaceMedia(answer);
-				}
 				//signal it
 				this.ns.event("addedtrack",{
 					streamId	: transceiver.sender.streamId,
@@ -2428,9 +2433,19 @@ class PeerConnectionClient
 		}
 		
 		//Now add all remote streams 
-		for (let stream of Object.values(this.streams))
+		for (let stream of Object.values(this.streams)) 
+		{
+			//Clone stream
+			const cloned = new StreamInfo(stream.getId());
+			//For each track
+			for (let [trackId,track] of stream.getTracks())
+				//Ensure it has been processed already to avoid having a track without an assigned media id
+				if (track.getMediaId())
+					//Safe to add it back
+					cloned.addTrack(track);
 			//Add it
-			this.remoteInfo.addStream(stream);
+			this.remoteInfo.addStream(cloned);
+		}
 		
 		//Set it
 		await this.pc.setRemoteDescription({
@@ -2459,6 +2474,8 @@ class PeerConnectionClient
 	
 	async addTrack(track,stream,params)
 	{
+		//Flag to force a renegotition
+		let force = false;
 		//Get send encodings
 		const sendEncodings = params && params.encodings || [];
 		//Create new transceiver
@@ -2472,7 +2489,15 @@ class PeerConnectionClient
 		transceiver.sender.streamId = stream ? stream.id : "-";
 		
 		//Hack for firefox as it doesn't support enabling simulcast on addTransceiver but on sender.setParameters
-		try { if (sendEncodings.length) await transceiver.sender.setParameters({encodings: sendEncodings}); } catch(e) {}
+		try { 
+			//If doing simulcast
+			if (sendEncodings.length)
+				//Set simuclast stuff
+				await transceiver.sender.setParameters({encodings: sendEncodings});
+			//Force renegotiation as event will have trigger before the event
+			force = true;
+		} catch(e) {
+		}
 		
 		//Get send params
 		const sendParameters = transceiver.sender.getParameters();
@@ -2488,6 +2513,11 @@ class PeerConnectionClient
 		transceiver.pending = true;
 		//Pending to signal
 		this.pending.add(transceiver);
+		
+		//Enqueue a renegotiation, as 
+		if (force)
+			//Renegotiate on next tick
+			setTimeout(()=>this.renegotiate(),0);
 		//Done
 		return transceiver.sender;
 	}
@@ -3681,7 +3711,7 @@ class MediaInfo {
 
 	/**
 	 * Set codec map
-	 * @param {Map<String,CodecInfo> codecs - Map of codec info objecs
+	 * @param {Map<Number,CodecInfo> codecs - Map of codec info objecs
 	 */
 	setCodecs(codecs) {
 		this.codecs = codecs;
@@ -4687,6 +4717,14 @@ class SDPInfo
 	}
 	
 	/**
+	 * Remove all streams
+	 */
+	removeAllStreams()
+	{
+		this.streams.clear();
+	}
+	
+	/**
 	 * 
 	 * @param {String} mid Media Id
 	 * @returns {TrackInfo| Track info
@@ -4699,6 +4737,21 @@ class SDPInfo
 					return track;
 		return null;
 	}
+	
+	/**
+	 * 
+	 * @param {String} mid Media Id
+	 * @returns {TrackInfo| Streaminfo
+	 */
+	getStreamByMediaId(mid)
+	{
+		for (let stream of this.streams.values())
+			for (let [trackId,track] of stream.getTracks())
+				if (track.getMediaId()==mid)
+					return stream;
+		return null;
+	}
+	
 	
 	/**
 	 * Create answer to this SDP
@@ -5108,9 +5161,14 @@ class SDPInfo
 									attribute	: "cname",
 									value		: stream.getId()
 								});
+								md.ssrcs.push({
+									id		: ssrcs[j],
+									attribute	: "msid",
+									value		: stream.getId() + " " + track.getId()
+								});
 							}
 							//Add msid
-							md.msid =  stream.getId() + " " + track.getId();
+							md.msid = stream.getId() + " " + track.getId();
 							//Done
 							break;
 						}
@@ -6381,11 +6439,20 @@ class StreamInfo {
 
 	/*
 	 * Remove a media track from stream
-	 * @param {Sring} trackId - Id of the track to remote
+	 * @param {TrackInfo} trackInfo - Info object from the track
 	 * @returns {TrackInfo} if the track was present on track map or not
 	 */
 	removeTrack(track) {
 		return this.tracks.delete(track.getId());
+	}
+	
+	/*
+	 * Remove a media track from stream
+	 * @param {Sring} trackId - Id of the track to remote
+	 * @returns {TrackInfo} if the track was present on track map or not
+	 */
+	removeTrackById(trackId) {
+		return this.tracks.delete(trackId);
 	}
 	/**
 	 * Get firs track for the media type
