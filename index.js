@@ -1,4 +1,5 @@
 const https = require ('https');
+const http = require('http');
 const url = require ('url');
 const fs = require ('fs');
 const path = require ('path');
@@ -46,7 +47,7 @@ const map = {
 	'.doc': 'application/msword'
 };
 
-//Create HTTP server
+//Create HTTPs server
 const server = https.createServer (options, (req, res) => {
 	// parse URL
 	const parsedUrl = url.parse (req.url);
@@ -87,7 +88,13 @@ const server = https.createServer (options, (req, res) => {
 			}
 		});
 	});
-}).listen (8000);
+}).listen (443);
+
+// Redirect from http port 80 to https
+http.createServer(function (req, res) {
+	res.writeHead(301, { "Location": "https://" + req.headers['host'] + req.url });
+	res.end();
+}).listen(80);
 
 const wsServer = new WebSocketServer ({
 	httpServer: server,
