@@ -88,13 +88,13 @@ const server = https.createServer (options, (req, res) => {
 			}
 		});
 	});
-}).listen (443);
+}).listen (8000);
 
 // Redirect from http port 80 to https
 http.createServer(function (req, res) {
 	res.writeHead(301, { "Location": "https://" + req.headers['host'] + req.url });
 	res.end();
-}).listen(80);
+}).listen(8080);
 
 const wsServer = new WebSocketServer ({
 	httpServer: server,
