@@ -118,9 +118,9 @@ async function sendTrack(simulcast,codecs)
 		if (simulcast)
 			//Add simulcast params
 			params.encodings = [
-				{ rid: "a"},
+				{ rid: "c" , scaleDownResolutionBy: 4.0 },
 				{ rid: "b" , scaleDownResolutionBy: 2.0 },
-				{ rid: "c" , scaleDownResolutionBy: 4.0 }
+				{ rid: "a"}
 			];
 		
 		//If overriding codecs

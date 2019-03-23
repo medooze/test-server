@@ -2,6 +2,7 @@ const url = "wss://"+window.location.hostname+":"+window.location.port;
 //Get our url
 const href = new URL(window.location.href);
 const codec = href.searchParams.get("codec") || "vp8";
+const reverse = href.searchParams.get("reverse");
 
 var opts = {
 	lines: 12, // The number of lines to draw
@@ -201,10 +202,14 @@ window.onload=()=>{
 		//Send track
 		pc.addTrack (stream.getVideoTracks()[0],stream,{
 			codecs : [codec],
-			encodings: [
-				{ rid: "a"},
-				{ rid: "b" , scaleResolutionDownBy : 2.0 },
-				{ rid: "c" , scaleResolutionDownBy : 4.0 }
+			encodings: reverse ? [
+				{ rid: "a" , active: true, },
+				{ rid: "b" , active: true, scaleResolutionDownBy : 2.0 },
+				{ rid: "c" , active: true, scaleResolutionDownBy : 4.0 }
+			] : [
+				{ rid: "c" , active: true, scaleResolutionDownBy : 4.0 },
+				{ rid: "b" , active: true, scaleResolutionDownBy : 2.0 },
+				{ rid: "a" , active: true, },
 			]
 		});
 		
