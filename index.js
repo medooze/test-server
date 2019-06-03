@@ -104,6 +104,7 @@ const wsServer = new WebSocketServer ({
 // Load the demo handlers
 const handlers = {
 	"simulcast"	: require("./lib/simulcast.js"),
+	"simulcast2"	: require("./lib/simulcast.js"),
 	"transceivers"	: require("./lib/PeerConnectionServerDemo.js"),
 	"partyline"	: require("./lib/PartyLine.js"),
 };

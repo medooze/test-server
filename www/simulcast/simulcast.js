@@ -5,6 +5,7 @@ const codec = href.searchParams.get("codec") || "vp8";
 const reverse = href.searchParams.has("reverse");
 const strictW3C = href.searchParams.has("strictW3C");
 const forceSDPMunging = href.searchParams.has("forceSDPMunging");
+const issue10470 = href.searchParams.has("issue10470");
 
 var opts = {
 	lines: 12, // The number of lines to draw
@@ -179,7 +180,7 @@ let pc;
 //Start everything
 window.onload=()=>{
 	//Connect with websocket
-	const ws = new WebSocket(url,"simulcast");
+	const ws = new WebSocket(url,issue10470 ? "simulcast2" : "simulcast");
 	
 	//Crete transaction manager 
 	const tm = new TransactionManager(ws);
