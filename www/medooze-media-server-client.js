@@ -2161,7 +2161,9 @@ class MediaServerClient
 			ns		: pcns,
 			pc		: pc,
 			remote		: remote,
-			localInfo	: localInfo
+			localInfo	: localInfo,
+			strictW3C	: options && options.strictW3C,
+			forceSDPMunging : options && options.forceSDPMunging
 		});
 	}
 	
@@ -2194,7 +2196,8 @@ class PeerConnectionClient
 		this.localInfo = params.localInfo;
 		this.remoteInfo = null;
 		this.streams = {};
-		this.strictW3C = false;
+		this.strictW3C = params.strictW3C;
+		this.forceSDPMunging = params.forceSDPMunging;
 		
 		//the list of pending transceivers 
 		this.pending = new Set();
@@ -2398,12 +2401,26 @@ class PeerConnectionClient
 		{
 			//Create offer
 			const offer = await this.pc.createOffer();
+			
+			//Get sdp
+			let sdp = offer.sdp;
 
 			//HACK: SDP mungling and codec enforcement
 			if (!this.strictW3C)
+			{
 				//Update offer
-				offer.sdp = fixLocalSDP(offer.sdp,transceivers);
-
+				sdp = fixLocalSDP(sdp,transceivers);
+				//If we are forcing sdp mungling we can't pass simulcast stuff into the local offer
+				if (this.forceSDPMunging)
+					//Do not pass simulcast into  local sdp
+					offer.sdp = sdp
+						.replace(/a=simulcast(.*)\r\n/,"")
+						.replace(/a=rid(.*)\r\n/,"");
+				else
+					//Update offer
+					offer.sdp = sdp;
+			}
+			
 			//Set local description
 			await this.pc.setLocalDescription(offer);
 			
@@ -2413,10 +2430,10 @@ class PeerConnectionClient
 				simulcast03 = offer.sdp.indexOf(": send rid=")!=-1;
 
 			//HACK: Firefox uses old simulcast so switch back
-			const sdp = simulcast03 ? offer.sdp.replace(": send rid=",":send ") : offer.sdp;
+			const sdpInfo = simulcast03 ? offer.sdp.replace(": send rid=",":send ") : sdp;
 			
 			//Parse local info 
-			this.localInfo = SDPInfo.parse(sdp);
+			this.localInfo = SDPInfo.parse(sdpInfo);
 		} else {
 			//HACK: for firefox. Check if we need to convert to simulcast-03 the answer
 			simulcast03 = (this.pc.pendingLocalDescription || this.pc.currentLocalDescription).sdp.indexOf(": send rid=")!=-1;
@@ -2441,8 +2458,16 @@ class PeerConnectionClient
 					continue;
 				//Clone capabilities for the media
 				const cloned = Object.assign({},capabilities);
-				//Set codecs
-				cloned.codecs = transceiver.codecs;
+				//Reset codecs
+				cloned.codecs = [];
+				//For each transceiver codec
+				for (const codec of transceiver.codecs)
+					//For
+					for (const supported of capabilities.codecs)
+						//If it is the same ignoring parameters
+						if (codec.toLowerCase()===supported.split(";")[0].toLowerCase())
+							//Add to cloned codecs
+							cloned.codecs.push(supported);
 				//Answer it
 				const answer = localMedia.answer(cloned);
 				//Replace media
@@ -2503,10 +2528,25 @@ class PeerConnectionClient
 			this.remoteInfo.addStream(cloned);
 		}
 		
+		//Create remote sdp
+		let sdp =  this.remoteInfo.toString();
+		
+		//If forcing sdp munging
+		if (this.forceSDPMunging)
+			//Remove all simulcast stuff from sdp
+			sdp = sdp
+				.replace(/a=simulcast(.*)\r\n/,"")
+				.replace(/a=rid(.*)\r\n/,"");
+			
+		//Hack for firefox
+		if (simulcast03)
+			//Use old simulcast format used by firefos
+			sdp = sdp.replace(":recv ",": recv rid=");
+		
 		//Set it
 		await this.pc.setRemoteDescription({
 			type	: "answer",
-			sdp	: simulcast03 ? this.remoteInfo.toString().replace(":recv ",": recv rid=") : this.remoteInfo.toString()
+			sdp	: sdp
 		});
 		
 		//Procces pending transceivers again
@@ -2541,7 +2581,7 @@ class PeerConnectionClient
 			transceiver = this.pc.addTransceiver(track,{
 				direction	: "sendonly",
 				streams		: stream ? [stream] : [],
-				sendEncodings	: sendEncodings
+				sendEncodings	: !this.forceSDPMunging ? sendEncodings : undefined
 			});
 		} catch (e) {
 			//HACK: old crhome
@@ -2563,10 +2603,12 @@ class PeerConnectionClient
 		if (!this.strictW3C) try { 
 			//If doing simulcast
 			if (sendEncodings.length)
-				//Set simuclast stuff
+			{
+				//Set simuclast stuff for firefox
 				await transceiver.sender.setParameters({encodings: sendEncodings});
-			//Force renegotiation as event will have trigger before the event
-			force = true;
+				//Force renegotiation as event will have trigger before the event
+				force = true;
+			}
 		} catch(e) {
 		}
 		
@@ -2576,9 +2618,16 @@ class PeerConnectionClient
 			//Get send params
 			const sendParameters = transceiver.sender.getParameters();
 			//Check if we need to fix simulcast info
-			if ((sendParameters.encodings ? sendParameters.encodings.length : 0 )!==sendEncodings.length)
-				//Store number of simulcast streams to add
-				transceiver.fixSimulcastEncodings = sendEncodings;
+			if (sendParameters.encodings)
+			{
+				//Ifwe could not set the encoding parameters yet 
+				if (sendParameters.encodings.length !==sendEncodings.length)
+					//Fix them later
+					transceiver.fixSimulcastEncodings = sendEncodings;
+				else
+					//We won't do munging even if requested (i.e. for firefox)
+					this.forceSDPMunging = false;
+			}
 			
 		}
 		//If we have to override codec
@@ -5935,7 +5984,7 @@ SDPInfo.parse = function(string)
 
 module.exports = SDPInfo;
 
-},{"./CandidateInfo":8,"./CodecInfo":9,"./DTLSInfo":10,"./Direction":11,"./DirectionWay":12,"./ICEInfo":14,"./MediaInfo":15,"./RIDInfo":16,"./RTCPFeedbackInfo":17,"./Setup":19,"./SimulcastInfo":20,"./SimulcastStreamInfo":21,"./SourceGroupInfo":22,"./SourceInfo":23,"./StreamInfo":24,"./TrackEncodingInfo":25,"./TrackInfo":26,"sdp-transform":29}],19:[function(require,module,exports){
+},{"./CandidateInfo":8,"./CodecInfo":9,"./DTLSInfo":10,"./Direction":11,"./DirectionWay":12,"./ICEInfo":14,"./MediaInfo":15,"./RIDInfo":16,"./RTCPFeedbackInfo":17,"./Setup":19,"./SimulcastInfo":20,"./SimulcastStreamInfo":21,"./SourceGroupInfo":22,"./SourceInfo":23,"./StreamInfo":24,"./TrackEncodingInfo":25,"./TrackInfo":26,"sdp-transform":30}],19:[function(require,module,exports){
 const Enum = require("./Enum");
 /**
  * Enum for Setup values.
@@ -7026,15 +7075,23 @@ TrackInfo.expand = function(plain)
 };
 
 module.exports = TrackInfo;
-
 },{"./SourceGroupInfo":22,"./TrackEncodingInfo":25}],27:[function(require,module,exports){
-(function (process,global,Buffer){
+(function (process,global){
 'use strict'
 
+// limit of Crypto.getRandomValues()
+// https://developer.mozilla.org/en-US/docs/Web/API/Crypto/getRandomValues
+var MAX_BYTES = 65536
+
+// Node supports requesting up to this number of bytes
+// https://github.com/nodejs/node/blob/master/lib/internal/crypto/random.js#L48
+var MAX_UINT32 = 4294967295
+
 function oldBrowser () {
-  throw new Error('secure random number generation not supported by this browser\nuse chrome, FireFox or Internet Explorer 11')
+  throw new Error('Secure random number generation is not supported by this browser.\nUse Chrome, Firefox or Internet Explorer 11')
 }
 
+var Buffer = require('safe-buffer').Buffer
 var crypto = global.crypto || global.msCrypto
 
 if (crypto && crypto.getRandomValues) {
@@ -7045,17 +7102,22 @@ if (crypto && crypto.getRandomValues) {
 
 function randomBytes (size, cb) {
   // phantomjs needs to throw
-  if (size > 65536) throw new Error('requested too many random bytes')
-  // in case browserify  isn't using the Uint8Array version
-  var rawBytes = new global.Uint8Array(size)
+  if (size > MAX_UINT32) throw new RangeError('requested too many random bytes')
 
-  // This will not work in older browsers.
-  // See https://developer.mozilla.org/en-US/docs/Web/API/window.crypto.getRandomValues
+  var bytes = Buffer.allocUnsafe(size)
+
   if (size > 0) {  // getRandomValues fails on IE if size == 0
-    crypto.getRandomValues(rawBytes)
+    if (size > MAX_BYTES) { // this is the max bytes crypto.getRandomValues
+      // can do at once see https://developer.mozilla.org/en-US/docs/Web/API/window.crypto.getRandomValues
+      for (var generated = 0; generated < size; generated += MAX_BYTES) {
+        // buffer.slice automatically checks if the end is past the end of
+        // the buffer so we don't have to here
+        crypto.getRandomValues(bytes.slice(generated, generated + MAX_BYTES))
+      }
+    } else {
+      crypto.getRandomValues(bytes)
+    }
   }
-  // phantomjs doesn't like a buffer being passed here
-  var bytes = new Buffer(rawBytes.buffer)
 
   if (typeof cb === 'function') {
     return process.nextTick(function () {
@@ -7066,8 +7128,72 @@ function randomBytes (size, cb) {
   return bytes
 }
 
-}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {},require("buffer").Buffer)
-},{"_process":4,"buffer":2}],28:[function(require,module,exports){
+}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"_process":4,"safe-buffer":28}],28:[function(require,module,exports){
+/* eslint-disable node/no-deprecated-api */
+var buffer = require('buffer')
+var Buffer = buffer.Buffer
+
+// alternative to using Object.keys for old browsers
+function copyProps (src, dst) {
+  for (var key in src) {
+    dst[key] = src[key]
+  }
+}
+if (Buffer.from && Buffer.alloc && Buffer.allocUnsafe && Buffer.allocUnsafeSlow) {
+  module.exports = buffer
+} else {
+  // Copy properties from require('buffer')
+  copyProps(buffer, exports)
+  exports.Buffer = SafeBuffer
+}
+
+function SafeBuffer (arg, encodingOrOffset, length) {
+  return Buffer(arg, encodingOrOffset, length)
+}
+
+// Copy static methods from Buffer
+copyProps(Buffer, SafeBuffer)
+
+SafeBuffer.from = function (arg, encodingOrOffset, length) {
+  if (typeof arg === 'number') {
+    throw new TypeError('Argument must not be a number')
+  }
+  return Buffer(arg, encodingOrOffset, length)
+}
+
+SafeBuffer.alloc = function (size, fill, encoding) {
+  if (typeof size !== 'number') {
+    throw new TypeError('Argument must be a number')
+  }
+  var buf = Buffer(size)
+  if (fill !== undefined) {
+    if (typeof encoding === 'string') {
+      buf.fill(fill, encoding)
+    } else {
+      buf.fill(fill)
+    }
+  } else {
+    buf.fill(0)
+  }
+  return buf
+}
+
+SafeBuffer.allocUnsafe = function (size) {
+  if (typeof size !== 'number') {
+    throw new TypeError('Argument must be a number')
+  }
+  return Buffer(size)
+}
+
+SafeBuffer.allocUnsafeSlow = function (size) {
+  if (typeof size !== 'number') {
+    throw new TypeError('Argument must be a number')
+  }
+  return buffer.SlowBuffer(size)
+}
+
+},{"buffer":2}],29:[function(require,module,exports){
 var grammar = module.exports = {
   v: [{
     name: 'version',
@@ -7274,7 +7400,7 @@ var grammar = module.exports = {
     },
     { //a=ssrc:2566107569 cname:t9YU8M1UxTF8Y1A1
       push: 'ssrcs',
-      reg: /^ssrc:(\d*) ([\w_]*)(?::(.*))?/,
+      reg: /^ssrc:(\d*) ([\w_-]*)(?::(.*))?/,
       names: ['id', 'attribute', 'value'],
       format: function (o) {
         var str = 'ssrc:%d';
@@ -7389,6 +7515,36 @@ var grammar = module.exports = {
       reg: /^framerate:(\d+(?:$|\.\d+))/,
       format: 'framerate:%s'
     },
+    { // RFC4570
+      //a=source-filter: incl IN IP4 239.5.2.31 10.1.15.5
+      name: 'sourceFilter',
+      reg: /^source-filter: *(excl|incl) (\S*) (IP4|IP6|\*) (\S*) (.*)/,
+      names: ['filterMode', 'netType', 'addressTypes', 'destAddress', 'srcList'],
+      format: 'source-filter: %s %s %s %s %s'
+    },
+    { //a=bundle-only
+      name: 'bundleOnly',
+      reg: /^(bundle-only)/
+    },
+    { //a=label:1
+      name: 'label',
+      reg: /^label:(.+)/,
+      format: 'label:%s'
+    },
+    {
+      // RFC version 26 for SCTP over DTLS
+      // https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-26#section-5
+      name:'sctpPort',
+      reg: /^sctp-port:(\d+)$/,
+      format: 'sctp-port:%s'
+    },
+    {
+      // RFC version 26 for SCTP over DTLS
+      // https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-26#section-6
+      name:'maxMessageSize',
+      reg: /^max-message-size:(\d+)$/,
+      format: 'max-message-size:%s'
+    },
     { // any a= that we don't understand is kepts verbatim on media.invalid
       push: 'invalid',
       names: ['value']
@@ -7409,7 +7565,7 @@ Object.keys(grammar).forEach(function (key) {
   });
 });
 
-},{}],29:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 var parser = require('./parser');
 var writer = require('./writer');
 
@@ -7422,7 +7578,7 @@ exports.parseRemoteCandidates = parser.parseRemoteCandidates;
 exports.parseImageAttributes = parser.parseImageAttributes;
 exports.parseSimulcastStreamList = parser.parseSimulcastStreamList;
 
-},{"./parser":30,"./writer":31}],30:[function(require,module,exports){
+},{"./parser":31,"./writer":32}],31:[function(require,module,exports){
 var toIntIfInt = function (v) {
   return String(Number(v)) === v ? Number(v) : v;
 };
@@ -7492,6 +7648,8 @@ var paramReducer = function (acc, expr) {
   var s = expr.split(/=(.+)/, 2);
   if (s.length === 2) {
     acc[s[0]] = toIntIfInt(s[1]);
+  } else if (s.length === 1 && expr.length > 1) {
+    acc[s[0]] = undefined;
   }
   return acc;
 };
@@ -7546,7 +7704,7 @@ exports.parseSimulcastStreamList = function (str) {
   });
 };
 
-},{"./grammar":28}],31:[function(require,module,exports){
+},{"./grammar":29}],32:[function(require,module,exports){
 var grammar = require('./grammar');
 
 // customized util.format - discards excess arguments and can void middle ones
@@ -7662,5 +7820,5 @@ module.exports = function (session, opts) {
   return sdp.join('\r\n') + '\r\n';
 };
 
-},{"./grammar":28}]},{},[5])(5)
+},{"./grammar":29}]},{},[5])(5)
 });

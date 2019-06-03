@@ -2,7 +2,9 @@ const url = "wss://"+window.location.hostname+":"+window.location.port;
 //Get our url
 const href = new URL(window.location.href);
 const codec = href.searchParams.get("codec") || "vp8";
-const reverse = href.searchParams.get("reverse");
+const reverse = href.searchParams.has("reverse");
+const strictW3C = href.searchParams.has("strictW3C");
+const forceSDPMunging = href.searchParams.has("forceSDPMunging");
 
 var opts = {
 	lines: 12, // The number of lines to draw
@@ -197,7 +199,10 @@ window.onload=()=>{
 		addLocalStream(stream);
 		
 		//Create new managed pc 
-		pc = await client.createManagedPeerConnection();
+		pc = await client.createManagedPeerConnection({
+			strictW3C	: strictW3C,
+			forceSDPMunging : forceSDPMunging
+		});
 		
 		//Send track
 		pc.addTrack (stream.getVideoTracks()[0],stream,{
