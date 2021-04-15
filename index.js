@@ -44,7 +44,8 @@ const map = {
 	'.mp3': 'audio/mpeg',
 	'.svg': 'image/svg+xml',
 	'.pdf': 'application/pdf',
-	'.doc': 'application/msword'
+	'.doc': 'application/msword',
+	'.csv': 'text/csv'
 };
 
 //Create HTTPs server
@@ -83,18 +84,22 @@ const server = https.createServer (options, (req, res) => {
 				res.end (`Error getting the file: ${err}.`);
 			} else {
 				// if the file is found, set Content-type and send data
-				res.setHeader ('Content-type', map[ext] || 'text/html');
+				res.setHeader('Content-type', map[ext] || 'text/html');
+				res.setHeader('Access-Control-Allow-Origin', '*');
+				res.setHeader('Access-Control-Request-Method', '*');
+				res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET');
+				res.setHeader('Access-Control-Allow-Headers', '*');
 				res.end (data);
 			}
 		});
 	});
-}).listen (443);
+}).listen (8443);
 
 // Redirect from http port 80 to https
 http.createServer(function (req, res) {
 	res.writeHead(301, { "Location": "https://" + req.headers['host'] + req.url });
 	res.end();
-}).listen(80);
+}).listen(8840);
 
 const wsServer = new WebSocketServer ({
 	httpServer: server,
@@ -106,6 +111,7 @@ const handlers = {
 	"simulcast"	: require("./lib/simulcast.js"),
 	"transceivers"	: require("./lib/PeerConnectionServerDemo.js"),
 	"partyline"	: require("./lib/PartyLine.js"),
+	"twcc"		: require("./lib/twcc.js"),
 };
 
 wsServer.on ('request', (request) => {

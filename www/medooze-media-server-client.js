@@ -2669,10 +2669,10 @@ class PeerConnectionClient
 		this.pc.removeTrack(sender);
 	}
 	
-	stop()
+	close()
 	{	
 		//Stop peerconnection
-		this.pc.stop();
+		this.pc.close();
 		//Close namespace
 		this.ns.close();
 		//Null

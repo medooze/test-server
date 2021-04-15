@@ -6,6 +6,45 @@ const reverse = href.searchParams.has("reverse");
 const strictW3C = href.searchParams.has("strictW3C");
 const forceSDPMunging = href.searchParams.has("forceSDPMunging");
 
+
+if (href.searchParams.has("video"))
+	switch (href.searchParams.get("video").toLowerCase())
+	{
+		case "1080p":
+			videoResolution = {
+				width: { min: 1920, max: 1920 },
+				height: { min: 1080, max: 1080 },
+			};
+			break;
+		case "720p":
+			videoResolution = {
+				width: { min: 1280, max: 1280 },
+				height: { min: 720, max: 720 },
+			};
+			break;
+		case "576p":
+			videoResolution = {
+				width: { min: 720, max: 720 },
+				height: { min: 576, max: 576 },
+			};
+			break;
+		case "480p":
+			videoResolution = {
+				width: { min: 640, max: 640 },
+				height: { min: 480, max: 480 },
+			};
+			break;
+		case "4k":
+			videoResolution = {
+				width: { min: 3840, max: 3840 },
+				height: { min: 2160, max: 2160 },
+			};
+			break;
+		case "no":
+			videoResolution = false;
+			break;
+	}
+
 var opts = {
 	lines: 12, // The number of lines to draw
 	angle: 0.15, // The length of each line
@@ -192,7 +231,7 @@ window.onload=()=>{
 		//Get new stream
 		const stream = await navigator.mediaDevices.getUserMedia({
 			audio: false,
-			video: {width: 1280, height: 720}
+			video: videoResolution
 		})
 		
 		//Add it
