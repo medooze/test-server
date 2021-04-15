@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/murillo128/media-server-demo-node#readme",
   "dependencies": {
+    "h264-encoder-mockup": "^1.6.0",
+    "medooze-media-server": "^0.103.0",
     "semantic-sdp": "^3",
     "transaction-manager": "^2.1.1",
     "websocket": "^1.0.28"
