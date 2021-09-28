@@ -161,7 +161,7 @@ function start()
 	ws.onclose = async () =>{
 		//Create urls
 		const csvUrl = "https://" + window.location.hostname + ":" + window.location.port + csv;
-		const bweUrl = "https://192.168.0.3/bwe?url=" + encodeURIComponent(csvUrl);
+		const bweUrl = "https://medooze.github.io/bwe-stats-viewer/?url=" + encodeURIComponent(csvUrl);
 
 		const div = document.createElement("div");
 		div.innerHTML = "<a href='" + bweUrl + "'>BWE viewer</a>&nbsp;<a href='" + csvUrl + "'>Download CSV</a>";
