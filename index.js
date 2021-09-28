@@ -32,6 +32,15 @@ const rest = Express();
 rest.use(CORS());
 rest.use(Express.static("www"));
 
+// Load the demo handlers
+const handlers = {
+	"simulcast"	: require("./lib/simulcast.js"),
+	"transceivers"	: require("./lib/PeerConnectionServerDemo.js"),
+	"partyline"	: require("./lib/PartyLine.js"),
+	"twcc"		: require("./lib/twcc.js"),
+};
+
+
 function wss(server)
 {
 	//Create websocket server
