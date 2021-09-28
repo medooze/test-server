@@ -1,24 +1,26 @@
 {
-  "name": "test-server",
-  "version": "1.0.2",
-  "description": "Test server",
-  "main": "index.js",
-  "scripts": {
-    "install": "openssl req  -nodes -new -x509  -keyout server.key -out server.cert -subj \"/CN=localhost\""
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/murillo128/media-server-demo-node.git"
-  },
-  "author": "Sergio Garcia Murillo",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/murillo128/media-server-demo-node/issues"
-  },
-  "homepage": "https://github.com/murillo128/media-server-demo-node#readme",
-  "dependencies": {
-    "semantic-sdp": "^3",
-    "transaction-manager": "^2.1.1",
-    "websocket": "^1.0.28"
-  }
+	"name": "test-server",
+	"version": "1.0.2",
+	"description": "Test server",
+	"main": "index.js",
+	"scripts": {
+		"install": "openssl req  -nodes -new -x509  -keyout server.key -out server.cert -subj \"/CN=localhost\""
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/murillo128/media-server-demo-node.git"
+	},
+	"author": "Sergio Garcia Murillo",
+	"license": "MIT",
+	"dependencies": {
+		"body-parser": "^1.19.0",
+		"cors": "^2.8.5",
+		"express": "^4.17.1",
+		"greenlock-express": "^4.0.3",
+		"h264-encoder-mockup": "^1",
+		"medooze-media-server": "^0",
+		"semantic-sdp": "^3",
+		"transaction-manager": "^2.1.3",
+		"websocket": "^1.0.26"
+	}
 }
