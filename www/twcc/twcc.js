@@ -2,6 +2,9 @@ const url = "wss://"+window.location.hostname+":"+window.location.port;
 //Get our url
 const href = new URL(window.location.href);
 const autostart = href.searchParams.has("autostart");
+const turn = href.searchParams.get("turn"); 
+const turnUsername = href.searchParams.get("turnUsername"); 
+const turnCredential = href.searchParams.get("turnCredential"); 
 
 var opts = {
 	lines: 12, // The number of lines to draw
@@ -147,7 +150,14 @@ function start()
 	ws.onopen = async ()=>{
 		
 		//Create new managed pc 
-		pc = await client.createManagedPeerConnection();
+		pc = await client.createManagedPeerConnection( turn ? {
+			iceTransportPolicy : "relay",
+			iceServers : [{
+				urls : turn,
+				username: turnUsername,
+				credential: turnCredential
+			}]
+		}:{});
 		
 		//On new remote tracks
 		pc.ontrack = (event)=>{
