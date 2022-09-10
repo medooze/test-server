@@ -18,7 +18,6 @@
 		"express": "^4.17.1",
 		"greenlock-express": "^4.0.3",
 		"h264-encoder-mockup": "^1",
-		"medooze-media-server": "^0",
 		"semantic-sdp": "^3",
 		"transaction-manager": "^2.1.3",
 		"websocket": "^1.0.26"

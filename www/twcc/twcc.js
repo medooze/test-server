@@ -1,4 +1,4 @@
-const url = "wss://"+window.location.hostname+":"+window.location.port;
+const url = "wss://"+window.location.hostname+":"+window.location.port + window.location.search;
 //Get our url
 const href = new URL(window.location.href);
 const autostart = href.searchParams.has("autostart");
@@ -171,7 +171,7 @@ function start()
 	ws.onclose = async () =>{
 		//Create urls
 		const csvUrl = "https://" + window.location.hostname + ":" + window.location.port + csv;
-		const bweUrl = "https://medooze.github.io/bwe-stats-viewer/?url=" + encodeURIComponent(csvUrl);
+		const bweUrl = "https://192.168.0.3/bwe-stats-viewer/?url=" + encodeURIComponent(csvUrl);
 
 		const div = document.createElement("div");
 		div.innerHTML = "<a href='" + bweUrl + "'>BWE viewer</a>&nbsp;<a href='" + csvUrl + "'>Download CSV</a>";
